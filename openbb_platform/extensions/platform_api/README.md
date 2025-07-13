@@ -68,9 +68,10 @@ Launcher specific arguments:
     --login                         Login to the OpenBB Platform.
     --exclude                       JSON encoded list of API paths to exclude from widgets.json. Disable entire routes with '*' - e.g. '["/api/v1/*"]'.
     --no-filter                     Do not filter out widgets in widget_settings.json file.
-    --widgets-path                  Absolute path to the widgets.json file. Default is ~/envs/{env}/assets/widgets.json. Supplying this sets --editable true.
-    --templates-path                Absolute path to the workspace_templates.json file. Default is ~/OpenBBUserData/workspace_templates.json.
-    --copilots-path                 Absolute path to the copilots.json file. Including this will add the /copilots endpoint to the API.
+    --widgets-json                  Absolute/relative path to use as the widgets.json file. Default is ~/envs/{env}/assets/widgets.json, when --editable is 'true'.
+    --apps-json                     Absolute/relative path to use as the apps.json file. Default is ~/OpenBBUserData/workspace_apps.json.
+    --agents-json                   Absolute/relative path to use as the agents.json file. Including this will add the /agents endpoint to the API.
+
 
 All other arguments will be passed to uvicorn. Here are the most common ones:
 
@@ -522,7 +523,64 @@ async def general_intake() -> list[IntakeForm]:
     return INTAKE_FORMS
 ```
 
-<img width="1552" alt="Screenshot 2025-03-09 at 9 51 47 PM" src="https://github.com/user-attachments/assets/16bb3844-ea43-44c8-ae44-67159b0b70e4" />
+<img width="1552" alt="Form Input Widget" src="https://github.com/user-attachments/assets/16bb3844-ea43-44c8-ae44-67159b0b70e4" />
+
+### Omni Widget Example
+
+
+```python
+from typing import Literal, Optional
+from openbb_platform_api.query_models import OmniWidgetInput
+from openbb_platform_api.response_models import OmniWidgetResponseModel
+from pydantic import Field
+
+class TestOmniWidgetQueryModel(OmniWidgetInput):
+    """Test query model for OmniWidget."""
+    param1: str = Field(description="A string parameter for testing")
+    param2: int = Field(description="An integer parameter for testing")
+    param3: bool = Field(default=False, description="A boolean parameter for testing")
+    start_date: str = Field(description="The start date for testing")
+    end_date: str = Field(description="The end date for testing")
+    parse_as: Optional[Literal["table", "chart", "text"]] = Field(
+        default=None,
+        description="The format to parse the response as, either 'table', 'chart', or 'text'."
+        + " If not defined, the model will try to infer the type based on the content.",
+    )
+
+@app.post("/omni_widget", response_model=OmniWidgetResponseModel)
+async def create_omni_widget(item: TestOmniWidgetQueryModel):
+    """This is a test endpoint for generating an OmniWidget in OpenBB Workspace."""
+    # Here you would process the incoming request and return a response
+    some_test_data = [
+        {"prompt": item.prompt,
+        "param1": item.param1,
+        "param2": item.param2,
+        "param3": item.param3,
+        "start_date": item.start_date,
+        "end_date": item.end_date,
+    }]
+
+    if item.parse_as == "chart":
+        some_test_data = {
+            "data": [{"type": "bar", "x": ["A", "B", "C"], "y": [1, 2, 3]}],
+            "layout": {"template": "...", "title": {"text": "Hello Chart!"}}
+        }
+    elif item.parse_as == "text":
+        some_test_data = f"""
+### This is a test OmniWidget response
+
+- Prompt: {item.prompt}
+- Param1: {item.param1}
+- Param2: {item.param2}
+- Param3: {item.param3}
+- Start Date: {item.start_date}
+- End Date: {item.end_date}
+"""
+    return {"content": some_test_data}
+```
+
+![Omni Widget](https://github.com/user-attachments/assets/6a5aa886-9701-4448-b397-ed7bab99cac7)
+
 
 ## Widget Config
 
@@ -582,28 +640,28 @@ openbb-api --editable --no-build
 If you would like to construct this file manually, create the file and define the path as an argument.
 
 ```sh
-openbb-api --widgets-path /Users/some_user/path/to/widgets.json
+openbb-api --widgets-json /Users/some_user/path/to/widgets.json
 ```
 
 
-### Location of `workspace_templates.json`
+### Location of `workspace_apps.json`
 
 By default, the location is:
 
-> ~/OpenBBUserData/workspace_templates.json
+> ~/OpenBBUserData/workspace_apps.json
 
 This can be changed by adding the path as an argument.
 
 ```sh
-openbb-api --templates-path /Users/some_user/path/to/workspace_templates.json
+openbb-api --apps-json /Users/some_user/path/to/workspace_apps.json
 ```
 
 The OpenBB Workspace allows you to export the current dashboard layout - when it is a custom backend - as a template.
 
-To export the layout, right-click on the dashboard and select, "Export Template".
+To export the layout, right-click on the dashboard and select, "Export apps.json".
 
-A JSON dictionary will be exported. Insert the contents of the export into "~/OpenBBUserData/workspace_templates.json" by pasting between the JSON list markers, [ ].
+A JSON dictionary will be exported. Insert the contents of the export into "~/OpenBBUserData/workspace_apps.json" by pasting between the JSON list markers, [ ].
 
 If there are more than one, add a comma between each dictionary entry.
 
-See the page [here](https://docs.openbb.co/terminal/custom-backend/advanced-controls/templates) for details on custom backend templates.
+See the page [here](https://docs.openbb.co/workspace/apps#creating-your-own-app) for details on custom backend apps.

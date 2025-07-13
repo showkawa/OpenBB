@@ -5,6 +5,7 @@
 from datetime import (
     date as dateType,
     datetime,
+    timezone,
 )
 from typing import Any, Dict, List, Optional
 from warnings import warn
@@ -93,8 +94,8 @@ class YFinanceShareStatisticsData(ShareStatisticsData):
     )
     @classmethod
     def validate_first_trade_date(cls, v):
-        """Convert  dates from UTC timestamp."""
-        return datetime.utcfromtimestamp(v).date() if v else None
+        """Convert dates from UTC timestamp."""
+        return datetime.fromtimestamp(v, timezone.utc).date() if v else None
 
 
 class YFinanceShareStatisticsFetcher(
@@ -116,6 +117,7 @@ class YFinanceShareStatisticsFetcher(
         """Extract the raw data from YFinance."""
         # pylint: disable=import-outside-toplevel
         import asyncio  # noqa
+        from curl_adapter import CurlCffiAdapter
         from openbb_core.app.model.abstract.error import OpenBBError
         from openbb_core.provider.utils.errors import EmptyDataError
         from openbb_core.provider.utils.helpers import get_requests_session
@@ -140,6 +142,8 @@ class YFinanceShareStatisticsFetcher(
             "institutionsCount",
         ]
         session = get_requests_session()
+        session.mount("https://", CurlCffiAdapter())
+        session.mount("http://", CurlCffiAdapter())
         messages: list = []
 
         async def get_one(symbol):
@@ -150,7 +154,6 @@ class YFinanceShareStatisticsFetcher(
                 _ticker = Ticker(
                     symbol,
                     session=session,
-                    proxy=session.proxies if session.proxies else None,
                 )
                 ticker = _ticker.get_info()
                 major_holders = _ticker.get_major_holders(as_dict=True).get("Value")
